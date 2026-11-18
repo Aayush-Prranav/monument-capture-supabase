@@ -12,6 +12,8 @@ started from its `dev_aayush_demo_mvp_1.0` branch with full history.
 **Play it:** https://aayush-prranav.github.io/monument-capture-supabase/
 (redeployed automatically on every push to `main`; see "Deployment" below).
 
+**Team members:** read [CONTRIBUTING.md](CONTRIBUTING.md) before your first change (who owns what, branches and PRs, database migrations).
+
 ## Layout
 
 | Path | What it is |
