@@ -47,6 +47,7 @@ started from its `dev_aayush_demo_mvp_1.0` branch with full history.
 | 4 | Photo upload to Supabase Storage, `submit_capture` | Done |
 | 5 | `decide_capture` moderator transaction and review queue | Done |
 | 6 | Monument management for moderators (`save_monument`, `set_monument_active`), deployment to GitHub Pages | Done |
+| + | Moderators can end a hold early (`release_hold`), with a reason the player sees | Done |
 
 Until a stage lands, that part of the game still runs on the local store in
 the browser, behind the backend switch below.

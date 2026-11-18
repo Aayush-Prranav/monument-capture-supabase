@@ -114,6 +114,13 @@ const MONUMENT_REFUSALS: Record<string, string> = {
   not_found: "This monument no longer exists.",
 };
 
+const RELEASE_REFUSALS: Record<string, string> = {
+  not_a_moderator: "Only moderators can end a hold.",
+  reason_required: "A reason is required to end a hold.",
+  not_held: "This monument isn't held right now.",
+  not_found: "This monument no longer exists.",
+};
+
 export const PHOTO_BUCKET = "capture-photos";
 
 /** Where a capture's photo must be uploaded; the server only accepts this path. */
@@ -288,6 +295,31 @@ export const game = {
       return { ok: true };
     } catch (e) {
       return failure(e, "Could not update.");
+    }
+  },
+
+  /** Moderators: end the current hold on a monument now, with a reason the player sees. */
+  async releaseHold(monumentId: string, reason: string): Promise<Result<{ holderName?: string }>> {
+    if (backendMode === "local") {
+      try {
+        const moderator = getDemoState().sessionUserId;
+        if (!moderator) return { ok: false, message: "Sign in first." };
+        demo.releaseHold(monumentId, moderator, reason);
+        return { ok: true };
+      } catch (e) {
+        return failure(e, "Could not end the hold.");
+      }
+    }
+    if (reason.trim().length < 3) return { ok: false, message: RELEASE_REFUSALS.reason_required! };
+    try {
+      const { data, error } = await getSupabase().rpc("release_hold", { p_monument_id: monumentId, p_reason: reason });
+      if (error) throw new Error(error.message);
+      const reply = data as { ok: true; holder_name?: string } | { ok: false; code: string };
+      await refreshMap();
+      if (!reply.ok) return { ok: false, code: reply.code, message: RELEASE_REFUSALS[reply.code] ?? "Could not end the hold." };
+      return { ok: true, holderName: reply.holder_name };
+    } catch (e) {
+      return failure(e, "Could not end the hold.");
     }
   },
 

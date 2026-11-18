@@ -157,6 +157,29 @@ describe("monument management against Supabase", () => {
   });
 });
 
+describe("ending a hold against Supabase", () => {
+  beforeEach(() => __setDemoStateForTests({ ...createSeedState(Date.now()), monuments: [] }));
+  afterEach(() => __setSupabaseForTests(null));
+
+  it("calls release_hold with the reason, then refreshes", async () => {
+    const rpc = fakeRpc({ release_hold: { ok: true, holder_name: "test1" } });
+    expect(await game.releaseHold("m1", "Screenshot")).toEqual({ ok: true, holderName: "test1" });
+    expect(rpc).toHaveBeenCalledWith("release_hold", { p_monument_id: "m1", p_reason: "Screenshot" });
+    expect(rpc).toHaveBeenCalledWith("get_game_state");
+  });
+
+  it("needs a reason before calling the server", async () => {
+    const rpc = fakeRpc({});
+    expect(await game.releaseHold("m1", " ")).toEqual({ ok: false, message: "A reason is required to end a hold." });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("explains when the hold already ended", async () => {
+    fakeRpc({ release_hold: { ok: false, code: "not_held" } });
+    expect(await game.releaseHold("m1", "Screenshot")).toEqual({ ok: false, code: "not_held", message: "This monument isn't held right now." });
+  });
+});
+
 describe("refusal messages", () => {
   const now = Date.parse("2026-11-18T01:00:00Z");
   it.each([
