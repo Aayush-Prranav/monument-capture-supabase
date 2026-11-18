@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { devToolsEnabled } from "../backend/config";
 import { game } from "../backend/game";
+import { usePhotoUrl } from "../backend/usePhotoUrl";
 import { DemoTools } from "../components/DemoTools";
 import { LOCK_DURATION_MS, findMonument, formatTimeAgo, getHistoryFor, getHoldingsFor, getPendingQueue, getPlayerStats, getHold } from "../demo/rules";
 import { getCapturePosition, type PositionResult } from "../demo/location";
@@ -422,7 +423,7 @@ export function QueueSheet({ now }: { now: number }) {
             const held = monument ? getHold(state, monument.id, now) : null;
             return (
               <li key={capture.id} className="tap" onClick={() => router.push(`/review/${capture.id}`)}>
-                <div className="ic"><img src={capture.photoUri} alt="" /></div>
+                <div className="ic"><QueuePhoto photoUri={capture.photoUri} /></div>
                 <div>
                   <b>{monumentIcon(monument)} {monument?.name ?? "Unknown monument"}</b>
                   <small>{player?.name ?? "Unknown player"} · {capture.distanceMeters} m · {formatTimeAgo(now - (capture.submittedAt ?? now))}</small>
@@ -468,3 +469,7 @@ export function MonumentsAdminSheet({ user, now }: { user: User; now: number }) 
   );
 }
 
+function QueuePhoto({ photoUri }: { photoUri: string }) {
+  const url = usePhotoUrl(photoUri);
+  return url ? <img src={url} alt="" /> : null;
+}

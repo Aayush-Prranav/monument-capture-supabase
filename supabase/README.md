@@ -25,6 +25,7 @@ with `rpc()` (added from Stage 1 on).
 | `20261118000000_profile_on_signup.sql` | 2026-11-17 |
 | `20261118010000_get_map.sql` | 2026-11-17 |
 | `20261118020000_start_capture.sql` | 2026-11-17 |
+| `20261118030000_capture_photos.sql` | 2026-11-17 |
 
 Add a row here whenever you run a new migration against the hosted project.
 

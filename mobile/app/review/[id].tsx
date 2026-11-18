@@ -1,4 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
+
+import { usePhotoUrl } from "../../src/backend/usePhotoUrl";
 import { useState } from "react";
 import { Image, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -72,7 +74,7 @@ export default function ReviewScreen() {
 
         return (
           <Screen title={monument.name} subtitle={`Submitted by ${player?.name ?? "unknown player"}`} back backTo="/?sheet=queue" backLabel="Queue">
-            <Image source={{ uri: capture.photoUri }} style={styles.photo} resizeMode="contain" accessibilityLabel="Submitted photo" />
+            <CapturePhoto photoUri={capture.photoUri} />
 
             <Card>
               <DetailRow
@@ -159,3 +161,16 @@ const styles = StyleSheet.create({
   row: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   linkText: { color: theme.colors.primary, fontWeight: "700" },
 });
+
+/** The submitted photo; in Supabase mode a short-lived signed URL from private Storage. */
+function CapturePhoto({ photoUri }: { photoUri: string }) {
+  const url = usePhotoUrl(photoUri);
+  if (!url) {
+    return (
+      <View style={[styles.photo, { alignItems: "center", justifyContent: "center" }]}>
+        <Text>Loading photo…</Text>
+      </View>
+    );
+  }
+  return <Image source={{ uri: url }} style={styles.photo} resizeMode="contain" accessibilityLabel="Submitted photo" />;
+}

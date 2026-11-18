@@ -56,6 +56,58 @@ describe("game actions against Supabase", () => {
   });
 });
 
+// A 1x1 JPEG as a data URL, like the camera produces.
+const JPEG = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=";
+
+function fakeStorageClient(uploadError: { message: string } | null, submitReply: unknown) {
+  const upload = vi.fn(async () => ({ data: uploadError ? null : { path: "p" }, error: uploadError }));
+  const from = vi.fn(() => ({ upload }));
+  const rpc = vi.fn(async (name: string) => ({ data: name === "submit_capture" ? submitReply : emptyState, error: null }));
+  __setSupabaseForTests({ rpc, storage: { from } } as unknown as SupabaseClient);
+  return { upload, from, rpc };
+}
+
+describe("submitting a capture against Supabase", () => {
+  beforeEach(() => __setDemoStateForTests({ ...createSeedState(Date.now()), monuments: [], sessionUserId: "u1" }));
+  afterEach(() => __setSupabaseForTests(null));
+
+  it("uploads the JPEG to the server-decided path without overwrite, then submits", async () => {
+    const { upload, from, rpc } = fakeStorageClient(null, { ok: true });
+    expect(await game.submitCapture("c1", JPEG)).toEqual({ ok: true });
+    expect(from).toHaveBeenCalledWith("capture-photos");
+    expect(upload).toHaveBeenCalledWith("u1/c1.jpg", expect.anything(), { contentType: "image/jpeg", upsert: false });
+    expect((upload.mock.calls[0] as unknown as [string, Blob])[1].type).toBe("image/jpeg");
+    expect(rpc).toHaveBeenCalledWith("submit_capture", { p_capture_id: "c1" });
+  });
+
+  it("a retry finds the photo already uploaded and still submits", async () => {
+    const { rpc } = fakeStorageClient({ message: "The resource already exists" }, { ok: true });
+    expect(await game.submitCapture("c1", JPEG)).toEqual({ ok: true });
+    expect(rpc).toHaveBeenCalledWith("submit_capture", { p_capture_id: "c1" });
+  });
+
+  it("an upload refused by Storage policy means the check-in expired", async () => {
+    const { rpc } = fakeStorageClient({ message: "new row violates row-level security policy" }, { ok: true });
+    const result = await game.submitCapture("c1", JPEG);
+    expect(result).toMatchObject({ ok: false, message: expect.stringMatching(/expired/) });
+    expect(rpc).not.toHaveBeenCalledWith("submit_capture", expect.anything());
+  });
+
+  it("explains the server's refusal", async () => {
+    fakeStorageClient(null, { ok: false, code: "not_in_progress" });
+    expect(await game.submitCapture("c1", JPEG)).toEqual({
+      ok: false, code: "not_in_progress", message: "This capture was already submitted or cancelled.",
+    });
+  });
+
+  it("refuses anything that isn't a JPEG before uploading", async () => {
+    const { upload } = fakeStorageClient(null, { ok: true });
+    const result = await game.submitCapture("c1", "data:image/png;base64,iVBORw0KGgo=");
+    expect(result.ok).toBe(false);
+    expect(upload).not.toHaveBeenCalled();
+  });
+});
+
 describe("refusal messages", () => {
   const now = Date.parse("2026-11-18T01:00:00Z");
   it.each([

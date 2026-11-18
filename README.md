@@ -41,8 +41,8 @@ started from its `dev_aayush_demo_mvp_1.0` branch with full history.
 | 1 | Real sign-up and login, profile created on sign-up, moderator script | Done |
 | 2 | Map reads monuments and holds from the server (`get_map()`), server clock | Done |
 | 3 | `start_capture` / `cancel_capture` with server-side distance and moderator flags | Done |
-| 4 | Photo upload to Supabase Storage, `submit_capture` | Next |
-| 5 | `decide_capture` moderator transaction and review queue | |
+| 4 | Photo upload to Supabase Storage, `submit_capture` | Done |
+| 5 | `decide_capture` moderator transaction and review queue | Next |
 | 6 | Monument management for moderators, deployment | |
 
 Until a stage lands, that part of the game still runs on the local store in
