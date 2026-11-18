@@ -45,6 +45,10 @@ export type Capture = {
   photoUri: string;
   startedAt: number;
   submittedAt: number | null;
+  /** Supabase mode: moderator flags the server recorded at check-in. */
+  flags?: string[];
+  /** Supabase mode: an in-progress capture must get its photo before this time. */
+  expiresAt?: number;
 };
 
 export type ReviewDecision = "approved" | "rejected";
@@ -91,6 +95,8 @@ export type DemoState = {
   serverClockOffsetMs?: number;
   /** Local unfinished work, retained privately across Supabase account changes. */
   accountDrafts?: Capture[];
+  /** Supabase mode: tunables from public.game_settings. */
+  serverSettings?: { lockDurationMs: number; maxAccuracyM: number; inProgressTtlMs: number };
   settings: DemoSettings;
 };
 

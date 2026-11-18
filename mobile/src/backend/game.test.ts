@@ -1,0 +1,71 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { createSeedState } from "../demo/seed";
+import { __setDemoStateForTests } from "../demo/store";
+import { game, startRefusalMessage } from "./game";
+import { __setSupabaseForTests } from "./supabaseClient";
+
+vi.mock("./config", () => ({
+  backendMode: "supabase",
+  devToolsEnabled: false,
+  supabaseUrl: "https://example.supabase.co",
+  supabasePublishableKey: "sb_publishable_test",
+}));
+
+const emptyState = { server_now: new Date().toISOString(), monuments: [], my_captures: [] };
+const position = { latitude: 40.7745, longitude: -73.9703, accuracyMeters: 8, timestampMs: Date.now() };
+
+function fakeRpc(replies: Record<string, unknown>) {
+  const rpc = vi.fn(async (name: string) => ({ data: name in replies ? replies[name] : emptyState, error: null }));
+  __setSupabaseForTests({ rpc } as unknown as SupabaseClient);
+  return rpc;
+}
+
+describe("game actions against Supabase", () => {
+  beforeEach(() => __setDemoStateForTests({ ...createSeedState(Date.now()), monuments: [] }));
+  afterEach(() => __setSupabaseForTests(null));
+
+  it("start sends only the monument and the reported position; identity and distance are the server's", async () => {
+    const rpc = fakeRpc({ start_capture: { ok: true, capture: { id: "c1" } } });
+    const result = await game.startCapture("m1", position, false);
+    expect(result).toEqual({ ok: true, captureId: "c1" });
+    expect(rpc).toHaveBeenCalledWith("start_capture", {
+      p_monument_id: "m1", p_latitude: 40.7745, p_longitude: -73.9703, p_accuracy_m: 8,
+    });
+    expect(rpc).toHaveBeenCalledWith("get_game_state");
+  });
+
+  it("explains a refusal using what the server measured", async () => {
+    fakeRpc({ start_capture: { ok: false, code: "too_far", distance_m: 150, radius_m: 100 } });
+    expect(await game.startCapture("m1", position, false)).toEqual({
+      ok: false, code: "too_far", message: "You are about 150 m away. Move 50 m closer and retry.",
+    });
+  });
+
+  it("cancel calls cancel_capture and refreshes", async () => {
+    const rpc = fakeRpc({ cancel_capture: true });
+    expect(await game.cancelCapture("c1")).toEqual({ ok: true });
+    expect(rpc).toHaveBeenCalledWith("cancel_capture", { p_capture_id: "c1" });
+  });
+
+  it("turns a network failure into a readable message", async () => {
+    __setSupabaseForTests({ rpc: vi.fn(async () => { throw new TypeError("Failed to fetch"); }) } as unknown as SupabaseClient);
+    const result = await game.startCapture("m1", position, false);
+    expect(result).toMatchObject({ ok: false, message: expect.stringMatching(/Can't reach/) });
+  });
+});
+
+describe("refusal messages", () => {
+  const now = Date.parse("2026-11-18T01:00:00Z");
+  it.each([
+    [{ code: "inaccurate", max_accuracy_m: 50 }, "Your GPS signal is not accurate enough (needs 50 m or better). Move to an open area and retry."],
+    [{ code: "held", holder_name: "Grace", locked_until: "2026-11-18T01:35:00Z" }, "Held by Grace for another 35 min. Come back when the lock expires."],
+    [{ code: "held_by_you", locked_until: "2026-11-18T02:00:00Z" }, "Held by you for another 1 h. Come back when the lock expires."],
+    [{ code: "already_pending" }, "You already have a capture of this monument waiting for review."],
+    [{ code: "monument_unavailable" }, "This monument is not available for capture."],
+    [{ code: "something_new" }, "The capture couldn't be started. Try again."],
+  ])("%o", (refusal, message) => {
+    expect(startRefusalMessage({ ok: false, ...refusal }, now)).toBe(message);
+  });
+});

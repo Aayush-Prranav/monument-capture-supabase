@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "../auth/AuthContext";
 import { devToolsEnabled } from "../backend/config";
+import { game } from "../backend/game";
 import { DemoTools } from "../components/DemoTools";
 import { LOCK_DURATION_MS, findMonument, formatTimeAgo, getHistoryFor, getHoldingsFor, getPendingQueue, getPlayerStats, getHold } from "../demo/rules";
 import { getCapturePosition, type PositionResult } from "../demo/location";
@@ -80,6 +81,7 @@ export function MonumentSheet({ monumentId, user, realLocation, now, justSubmitt
   const monument = findMonument(state, monumentId);
   const [elig, setElig] = useState<Eligibility>({ kind: "idle" });
   const [error, setError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
 
   const isPlayer = user.role === "player";
   const view = monument ? monumentView(state, monument, user.id, now) : null;
@@ -157,13 +159,13 @@ export function MonumentSheet({ monumentId, user, realLocation, now, justSubmitt
       router.push(`/manage-monument/${monument.id}`);
       return;
     }
-    if (elig.kind !== "result" || !elig.check.ok) return;
-    try {
-      demo.startCapture(monument.id, user.id, elig.position.position, elig.position.simulated);
-      router.push("/capture");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not start the capture.");
-    }
+    if (elig.kind !== "result" || !elig.check.ok || starting) return;
+    setStarting(true);
+    void game.startCapture(monument.id, elig.position.position, elig.position.simulated).then((result) => {
+      setStarting(false);
+      if (result.ok) router.push("/capture");
+      else setError(result.message);
+    });
   };
 
   const canTeleport = devToolsEnabled && isPlayer && view.kind === "free" && !pending && !(loc.mode === "simulated" && loc.monumentId === monument.id);
@@ -182,7 +184,7 @@ export function MonumentSheet({ monumentId, user, realLocation, now, justSubmitt
         {isPlayer ? <Row label="Your record" value={getRecordLine(state, user.id, monument.id, now)} /> : null}
         {pending ? <Row label="Your capture" value={`⏳ Pending review · ${formatTimeAgo(now - (pending.submittedAt ?? now))}`} /> : null}
       </div>
-      <button type="button" className="mc-cta" disabled={!enabled} onClick={onCta}>{cta}</button>
+      <button type="button" className="mc-cta" disabled={!enabled || starting} onClick={onCta}>{starting ? "Checking in…" : cta}</button>
       <div className="mc-hint" aria-live="polite">{error ?? hint}</div>
       {canTeleport ? (
         <div className="mc-hint">

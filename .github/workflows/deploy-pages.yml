@@ -1,0 +1,62 @@
+# Builds the web app in Supabase mode and publishes it to GitHub Pages
+# (HTTPS, which browsers require for location and camera).
+#
+# The Supabase URL and publishable key are public by design: the database's
+# grants and row-level security decide what they can do. Never add the secret
+# key or the database password here.
+
+name: Deploy web app to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build the web app (Supabase mode, demo tools off)
+        run: npx expo export -p web
+        env:
+          EXPO_PUBLIC_BACKEND: supabase
+          EXPO_PUBLIC_SUPABASE_URL: https://jqxffydjcjkqftifijcp.supabase.co
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_d3sr609cxJGUegq89qsBLA_oB1ueNyr
+          EXPO_PUBLIC_DEV_TOOLS: "false"
+          EXPO_BASE_URL: /${{ github.event.repository.name }}
+      # Single-page app: unknown paths (deep links, refreshes) fall back to the app.
+      - run: cp dist/index.html dist/404.html && touch dist/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: mobile/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
