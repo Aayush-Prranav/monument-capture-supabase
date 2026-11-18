@@ -58,6 +58,11 @@ commit;
 SQL
     then echo ok >"$tmp/result.$i"
     elif grep -q 'one_holder_at_a_time' "$tmp/out.$i"; then echo blocked >"$tmp/result.$i"
+    # Simultaneous inserts into an exclusion constraint can wait on each other;
+    # Postgres then cancels one as a deadlock. That is also a refusal, and it
+    # can never produce a second holder. (decide_capture avoids it entirely by
+    # locking the monument row first.)
+    elif grep -q 'deadlock detected' "$tmp/out.$i"; then echo deadlock >"$tmp/result.$i"
     else echo error >"$tmp/result.$i"
     fi
   ) &
@@ -66,17 +71,18 @@ wait
 
 ok=$(cat "$tmp"/result.* | grep -cx 'ok' || true)
 blocked=$(cat "$tmp"/result.* | grep -cx 'blocked' || true)
+deadlocks=$(cat "$tmp"/result.* | grep -cx 'deadlock' || true)
 errors=$(cat "$tmp"/result.* | grep -cx 'error' || true)
 holders="$("${psql_db[@]}" -Atc "
   select count(*) from public.capture_reviews r join public.monuments m on m.id = r.monument_id
   where m.slug = 'bethesda' and r.decision = 'approved' and r.locked_until > now()")"
 
-echo "  committed: $ok   refused by one_holder_at_a_time: $blocked   other errors: $errors"
+echo "  committed: $ok   refused by one_holder_at_a_time: $blocked   refused as deadlock: $deadlocks   other errors: $errors"
 echo "  active holders of Bethesda Fountain: $holders"
 
 "${psql_db[@]}" -c "delete from public.capture_reviews; delete from public.captures;"
 
-if [[ "$ok" == 1 && "$holders" == 1 && "$errors" == 0 && "$blocked" == $((${#captures[@]} - 1)) ]]; then
+if [[ "$ok" == 1 && "$holders" == 1 && "$errors" == 0 && $((blocked + deadlocks)) == $((${#captures[@]} - 1)) ]]; then
   echo "  PASS: exactly one holder"
 else
   echo "  FAIL"; cat "$tmp"/out.* >&2; exit 1

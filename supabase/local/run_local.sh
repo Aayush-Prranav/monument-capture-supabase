@@ -4,7 +4,7 @@
 # and every migration in order, then runs the pgTAP tests and the concurrency
 # test. Never point this at the hosted project.
 #
-# Usage: supabase/tests/run_local.sh            (uses PG* env vars / local socket)
+# Usage: supabase/local/run_local.sh            (uses PG* env vars / local socket)
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
