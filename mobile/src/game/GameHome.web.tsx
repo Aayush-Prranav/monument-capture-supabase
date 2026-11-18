@@ -18,6 +18,7 @@ import {
   getPlayerLevel,
   monumentIcon,
 } from "../demo/selectors";
+import { useMapSyncStatus } from "../backend/mapSync";
 import { useDemoState, useNow } from "../demo/store";
 import type { User } from "../demo/types";
 import { monumentViews } from "../demo/views";
@@ -79,6 +80,7 @@ export function GameHome({ user, initialSheet, initialMonumentId, justSubmitted 
   useEffect(() => installWebTheme(), []);
   const state = useDemoState();
   const now = useNow(1000);
+  const sync = useMapSyncStatus();
   const { location } = usePlayerLocation();
   const [map, setMap] = useState<LeafletMap | null>(null);
   const [zoom, setZoom] = useState(MIN_ZOOM);
@@ -239,6 +241,16 @@ export function GameHome({ user, initialSheet, initialMonumentId, justSubmitted 
         <button type="button" className="mc-round" aria-label="Zoom in" disabled={zoom >= MAX_ZOOM} onClick={() => map?.zoomIn()}>+</button>
         <button type="button" className="mc-round" aria-label="Zoom out" disabled={zoom <= MIN_ZOOM} onClick={() => map?.zoomOut()}>−</button>
       </div>
+
+      {sync.state === "error" ? (
+        <div className="mc-status" style={{ top: "auto", bottom: tileError ? 168 : 120, left: "50%", transform: "translateX(-50%)", padding: "8px 14px" }} role="status">
+          {sync.message}
+        </div>
+      ) : sync.state === "loading" && state.monuments.length === 0 ? (
+        <div className="mc-status" style={{ top: "auto", bottom: 120, left: "50%", transform: "translateX(-50%)", padding: "8px 14px" }} role="status">
+          Loading monuments…
+        </div>
+      ) : null}
 
       {tileError ? (
         <div className="mc-status" style={{ top: "auto", bottom: 120, left: "50%", transform: "translateX(-50%)", padding: "8px 14px" }} role="status">

@@ -1,0 +1,175 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { getHold } from "../demo/rules";
+import { createSeedState } from "../demo/seed";
+import type { DemoState } from "../demo/types";
+import { monumentViews } from "../demo/views";
+import { applyServerMap, clockOffsetMs, parseServerMap, type ServerMap, type ServerMonument } from "./serverMap";
+
+const T0 = Date.parse("2026-11-18T00:30:00Z");
+const ME = "aaaaaaaa-0000-0000-0000-000000000001";
+const OTHER = "aaaaaaaa-0000-0000-0000-000000000002";
+
+const monument = (id: string, extra: Partial<ServerMonument> = {}): ServerMonument => ({
+  id, slug: id, name: `M ${id}`, neighborhood: "Brooklyn", description: "", icon: "📍",
+  latitude: 40.69, longitude: -73.98, capture_radius_m: 100, active: true, is_test: false, hold: null, ...extra,
+});
+
+const map = (monuments: ServerMonument[], serverNow = new Date(T0).toISOString()): ServerMap => ({ server_now: serverNow, monuments });
+
+/** A signed-in Supabase player in an empty Supabase-mode world. */
+function world(): DemoState {
+  const seed = createSeedState(T0);
+  return {
+    ...seed,
+    users: [{ id: ME, name: "Ada", email: "ada@test.dev", role: "player" }],
+    monuments: [],
+    captures: [],
+    reviews: [],
+    sessionUserId: ME,
+  };
+}
+
+const heldBy = (who: string, name: string, minutesLeft: number) => ({
+  capture_id: `cap-${who}`,
+  holder_id: who,
+  holder_name: name,
+  held_since: new Date(T0 - 10 * 60_000).toISOString(),
+  locked_until: new Date(T0 + minutesLeft * 60_000).toISOString(),
+});
+
+describe("applying the server map", () => {
+  it("replaces monuments with the server's, mapping field names", () => {
+    const next = applyServerMap(world(), map([monument("m1", { name: "Bethesda Fountain", capture_radius_m: 100, icon: "⛲" })]), T0, T0);
+    expect(next.monuments).toEqual([{
+      id: "m1", name: "Bethesda Fountain", neighborhood: "Brooklyn", description: "",
+      latitude: 40.69, longitude: -73.98, captureRadiusMeters: 100, icon: "⛲", active: true,
+    }]);
+  });
+
+  it("shows another player's hold with their display name and countdown", () => {
+    const next = applyServerMap(world(), map([monument("m1", { hold: heldBy(OTHER, "Grace", 30) })]), T0, T0);
+    const hold = getHold(next, "m1", T0);
+    expect(hold.status).toBe("held");
+    if (hold.status === "held") {
+      expect(hold.holder.name).toBe("Grace");
+      expect(hold.lockedUntil - T0).toBe(30 * 60_000);
+    }
+    const [view] = monumentViews(next, ME, T0);
+    expect(view?.kind).toBe("held");
+    expect(view?.statusLine).toBe("Held by Grace · 30 min left");
+  });
+
+  it("recognises the signed-in player's own hold, without losing their email", () => {
+    const next = applyServerMap(world(), map([monument("m1", { hold: heldBy(ME, "Ada", 5) })]), T0, T0);
+    expect(monumentViews(next, ME, T0)[0]?.kind).toBe("mine");
+    expect(next.users.find((u) => u.id === ME)).toMatchObject({ email: "ada@test.dev", role: "player" });
+  });
+
+  it("a later sync without the hold frees the monument (no stale copies)", () => {
+    const first = applyServerMap(world(), map([monument("m1", { hold: heldBy(OTHER, "Grace", 30) })]), T0, T0);
+    const second = applyServerMap(first, map([monument("m1")]), T0, T0);
+    expect(getHold(second, "m1", T0).status).toBe("free");
+    expect(second.captures).toHaveLength(0);
+    expect(second.reviews).toHaveLength(0);
+  });
+
+  it("keeps local work and photo data even when a monument is unavailable", () => {
+    const base = world();
+    base.captures = [
+      { id: "local-1", monumentId: "m1", playerId: ME, status: "in_progress", distanceMeters: 5, accuracyMeters: 5,
+        simulatedPosition: false, photoUri: "", startedAt: T0, submittedAt: null },
+      { id: "local-2", monumentId: "liberty", playerId: ME, status: "pending", distanceMeters: 5, accuracyMeters: 5,
+        simulatedPosition: false, photoUri: "x", startedAt: T0, submittedAt: T0 },
+    ];
+    const next = applyServerMap(base, map([monument("m1")]), T0, T0);
+    expect(next.captures.map((c) => c.id)).toEqual(["local-1", "local-2"]);
+    expect(next.captures[1]?.photoUri).toBe("x");
+  });
+
+  it("hides nothing a moderator should see: inactive monuments come through marked inactive", () => {
+    const next = applyServerMap(world(), map([monument("m1", { active: false })]), T0, T0);
+    expect(next.monuments[0]?.active).toBe(false);
+    expect(monumentViews(next, ME, T0)).toHaveLength(0);
+    expect(monumentViews(next, ME, T0, true)[0]?.kind).toBe("inactive");
+  });
+});
+
+describe("server clock", () => {
+  it("measures the database clock against the device clock at the request midpoint", () => {
+    // Device clock 2 minutes slow: server says T0, request took 400 ms around T0 - 2 min.
+    const sentAt = T0 - 120_000 - 200;
+    const receivedAt = T0 - 120_000 + 200;
+    expect(clockOffsetMs(new Date(T0).toISOString(), sentAt, receivedAt)).toBe(120_000);
+  });
+
+  it("is stored with the map, so countdowns use server time", () => {
+    const next = applyServerMap(world(), map([], new Date(T0 + 5_000).toISOString()), T0, T0);
+    expect(next.serverClockOffsetMs).toBe(5_000);
+  });
+
+  it("ignores an unreadable server time", () => {
+    expect(clockOffsetMs("not a date", T0, T0)).toBe(0);
+  });
+});
+
+describe("parsing", () => {
+  it("rejects anything that isn't a map", () => {
+    expect(() => parseServerMap(null)).toThrow();
+    expect(() => parseServerMap({ monuments: [] })).toThrow();
+    expect(parseServerMap(map([])).monuments).toEqual([]);
+  });
+});
+
+
+describe("map safety regressions", () => {
+  it("rejects invalid coordinates and hold dates before updating map state", () => {
+    for (const latitude of [NaN, Infinity, 91]) {
+      expect(() => parseServerMap(map([monument("m", { latitude })]))).toThrow();
+    }
+    expect(() => parseServerMap(map([null as unknown as ServerMonument]))).toThrow();
+    expect(() => parseServerMap(map([monument("m", { hold: { ...heldBy(OTHER, "Grace", 5), locked_until: "invalid" } })]))).toThrow();
+  });
+
+  it("maps a legacy draft slug to its server UUID without losing its photo", () => {
+    const base = world();
+    base.captures = [{ id: "draft", monumentId: "bethesda", playerId: ME, status: "in_progress",
+      distanceMeters: 5, accuracyMeters: 5, simulatedPosition: false, photoUri: "my-photo",
+      startedAt: T0, submittedAt: null }];
+    const next = applyServerMap(base, map([monument("uuid", { slug: "bethesda" })]), T0, T0);
+    expect(next.captures[0]).toMatchObject({ id: "draft", monumentId: "uuid", photoUri: "my-photo" });
+  });
+
+  it("isolates Supabase accounts, preserves drafts across reload, and respects cancellation", async () => {
+    vi.resetModules();
+    vi.doMock("./config", () => ({ backendMode: "supabase", devToolsEnabled: false }));
+    vi.doMock("../demo/storage", () => import("../demo/storage.web"));
+    try {
+      const store = await import("../demo/store");
+      const base = world();
+      base.captures = [{ id: "private", monumentId: "legacy", playerId: ME, status: "in_progress",
+        distanceMeters: 5, accuracyMeters: 5, simulatedPosition: false, photoUri: "private-photo",
+        startedAt: T0, submittedAt: null }];
+      store.__setDemoStateForTests(base);
+      store.demo.logout();
+      expect(store.getDemoState()).toMatchObject({ sessionUserId: null, users: [], monuments: [], captures: [], reviews: [] });
+      store.demo.signInAs({ id: OTHER, name: "Other", email: "other@test.dev", role: "moderator" });
+      expect(store.getDemoState().captures).toEqual([]);
+      store.demo.logout();
+      vi.resetModules();
+      const restored = await import("../demo/store");
+      expect(restored.getDemoState().sessionUserId).toBeNull();
+      restored.demo.signInAs({ id: ME, name: "Ada", email: "ada@test.dev", role: "player" });
+      expect(restored.getDemoState().captures[0]).toMatchObject({ id: "private", photoUri: "private-photo" });
+      restored.demo.cancelCapture("private");
+      restored.demo.logout();
+      restored.demo.signInAs({ id: ME, name: "Ada", email: "ada@test.dev", role: "player" });
+      expect(restored.getDemoState().captures).toEqual([]);
+    } finally {
+      vi.doUnmock("./config");
+      vi.doUnmock("../demo/storage");
+      window.localStorage.clear();
+      vi.resetModules();
+    }
+  });
+});

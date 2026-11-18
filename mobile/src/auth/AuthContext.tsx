@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 
 import { backendMode, type BackendMode } from "../backend/config";
+import { startMapSync } from "../backend/mapSync";
 import { useCurrentUser } from "../demo/store";
 import type { User } from "../demo/types";
 import type { AuthBackend, AuthResult, SignUpInput } from "./authBackend";
@@ -36,6 +37,12 @@ type AuthContextType = {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => backend.start(), []);
+  // Stage 2: while someone is signed in to Supabase, keep the map in sync.
+  const userId = useCurrentUser()?.id;
+  useEffect(() => {
+    if (backend.kind !== "supabase" || !userId) return;
+    return startMapSync();
+  }, [userId]);
   return <>{children}</>;
 }
 

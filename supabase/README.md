@@ -23,6 +23,7 @@ with `rpc()` (added from Stage 1 on).
 | `20261117230300_seed_monuments.sql` | 2026-11-17 |
 | `20261117230400_no_auto_expose.sql` | 2026-11-17 |
 | `20261118000000_profile_on_signup.sql` | 2026-11-17 |
+| `20261118010000_get_map.sql` | 2026-11-17 |
 
 Add a row here whenever you run a new migration against the hosted project.
 
