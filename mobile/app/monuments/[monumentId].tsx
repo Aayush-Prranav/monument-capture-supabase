@@ -1,3 +1,4 @@
+import { devToolsEnabled } from "../../src/backend/config";
 import { router, useLocalSearchParams } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -95,7 +96,7 @@ export default function MonumentDetailsScreen() {
               <DetailRow label="Coordinates" value={`${monument.latitude.toFixed(4)}, ${monument.longitude.toFixed(4)}`} />
             </Card>
 
-            {isPlayer && monument.active ? (
+            {devToolsEnabled && isPlayer && monument.active ? (
               <Card style={{ borderStyle: "dashed" }}>
                 <Text style={styles.demoLabel}>DEMO TOOL</Text>
                 <Text style={styles.description}>

@@ -3,6 +3,8 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 
+import { useAuth } from "../auth/AuthContext";
+import { devToolsEnabled } from "../backend/config";
 import { DemoTools } from "../components/DemoTools";
 import { LOCK_DURATION_MS, findMonument, formatTimeAgo, getHistoryFor, getHoldingsFor, getPendingQueue, getPlayerStats, getHold } from "../demo/rules";
 import { getCapturePosition, type PositionResult } from "../demo/location";
@@ -164,7 +166,7 @@ export function MonumentSheet({ monumentId, user, realLocation, now, justSubmitt
     }
   };
 
-  const canTeleport = isPlayer && view.kind === "free" && !pending && !(loc.mode === "simulated" && loc.monumentId === monument.id);
+  const canTeleport = devToolsEnabled && isPlayer && view.kind === "free" && !pending && !(loc.mode === "simulated" && loc.monumentId === monument.id);
 
   return (
     <div>
@@ -196,6 +198,7 @@ export function MonumentSheet({ monumentId, user, realLocation, now, justSubmitt
 // ---------------------------------------------------------------------------
 
 export function ProfileSheet({ user, now }: { user: User; now: number }) {
+  const { backend, logout } = useAuth();
   const state = useDemoState();
   const isModerator = user.role === "moderator";
   const stats = getPlayerStats(state, user.id, now);
@@ -235,26 +238,31 @@ export function ProfileSheet({ user, now }: { user: User; now: number }) {
         <Row label="Location" value={getLocationLabel(state)} />
       </div>
 
-      <div className="mc-section">Switch account (demo)</div>
-      <div className="mc-sort" style={{ marginTop: 0 }}>
-        {state.users.map((u) => (
-          <button key={u.id} type="button" className={`mc-small-btn${u.id === user.id ? " on" : ""}`} onClick={() => demo.switchUser(u.id)}>
-            {u.name.split(" ")[0]} · {u.role === "moderator" ? "Mod" : "Player"}
-          </button>
-        ))}
-      </div>
+      {backend === "local" ? (
+        <>
+          <div className="mc-section">Switch account (demo)</div>
+          <div className="mc-sort" style={{ marginTop: 0 }}>
+            {state.users.map((u) => (
+              <button key={u.id} type="button" className={`mc-small-btn${u.id === user.id ? " on" : ""}`} onClick={() => demo.switchUser(u.id)}>
+                {u.name.split(" ")[0]} · {u.role === "moderator" ? "Mod" : "Player"}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
 
-      <div style={{ marginTop: 16 }}>
-        <DemoTools />
-      </div>
+      {devToolsEnabled ? (
+        <div style={{ marginTop: 16 }}>
+          <DemoTools />
+        </div>
+      ) : null}
 
       <button
         type="button"
         className="mc-cta dark"
         style={{ marginTop: 18 }}
         onClick={() => {
-          demo.logout();
-          router.replace("/login");
+          void logout().finally(() => router.replace("/login"));
         }}
       >
         Sign out
