@@ -6,7 +6,7 @@
 
 - Start every branch from an up-to-date `main` and name it `dev_<name>_<topic>`, e.g. `dev_iris_auth`. Delete it after it's merged.
 - **Old branches:** `playground`, `prestaging`, `prod`, `non_demo`, `mvp_with_6mtc`, `iris-dev` and the `dev_*_US_*` branches hold the earlier local-only demo.
-  - The shared ones have been archived as `archive/<name>` tags. Don't branch from them or merge them into `main`.
+  - They're kept for reference only (each also has an `archive/<name>` tag). Don't branch from them, open PRs into them, or merge them into `main`.
   - To bring something across from an old branch, rebuild it on current `main`.
 
 ## The five parts (do these first, in order)
