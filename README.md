@@ -100,6 +100,15 @@ GitHub Pages over HTTPS (browsers only allow location and camera on HTTPS).
 The workflow contains only the project URL and publishable key, which are
 public by design. Never add the secret key or the database password to it.
 
+### Vercel (alternative host)
+
+`mobile/vercel.json` holds the build settings (build `npx expo export -p web`,
+output `dist`, every unknown path served by `index.html`). In Vercel: import
+the repo, set **Root Directory** to `mobile`, and add these environment
+variables: `EXPO_PUBLIC_BACKEND=supabase`, `EXPO_PUBLIC_SUPABASE_URL`,
+`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `EXPO_PUBLIC_DEV_TOOLS=false`.
+Vercel serves from the root, so `EXPO_BASE_URL` stays unset there.
+
 ## Checks
 
 ```bash
