@@ -460,7 +460,7 @@ export function MonumentsAdminSheet({ user, now }: { user: User; now: number }) 
             </div>
             <div style={{ marginLeft: "auto", display: "flex", gap: 6, flex: "none" }}>
               <button type="button" className="mc-small-btn" onClick={() => router.push(`/manage-monument/${monument.id}`)}>Edit</button>
-              <button type="button" className="mc-small-btn" onClick={() => demo.setMonumentActive(monument.id, !monument.active)}>
+              <button type="button" className="mc-small-btn" onClick={() => void game.setMonumentActive(monument.id, !monument.active)}>
                 {monument.active ? "Hide" : "Show"}
               </button>
             </div>
