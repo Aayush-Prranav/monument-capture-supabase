@@ -3,6 +3,15 @@
 `main` is the working game: Supabase backend (`supabase/`) plus the Expo web app (`mobile/`).
 Nobody pushes to `main` directly. Every change goes through a branch and a pull request.
 
+## Branches
+
+- `main` is the only shared branch. Start every branch from it and open every PR into it. A merge to `main` redeploys the live site.
+- `dev_<name>_<topic>` branches are yours. Delete them once they're merged.
+- **Old branches:** `playground`, `prestaging`, `prod`, `non_demo`, `mvp_with_6mtc`, `iris-dev`, and the `dev_*_US_*` branches all hold the earlier local-only demo (no server, fake sign-in).
+  - Don't branch from them or merge them into `main`. To bring a feature across, rebuild it on current `main`.
+  - Planned cleanup, once the team agrees: each shared old branch gets a tag (e.g. `archive/playground`) and is then deleted. The code and PR history stay reachable through the tag.
+  - Personal `dev_*` branches are left for their owners to delete.
+
 ## Who owns what
 
 Each person owns an area: you build in it, and you review PRs that touch it.
