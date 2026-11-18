@@ -10,7 +10,21 @@ with `rpc()` (added from Stage 1 on).
 |---|---|
 | `migrations/` | The schema, in order. These are what you run against the hosted project. |
 | `tests/database/` | pgTAP tests. Portable: they also run with `supabase test db`. |
+| `scripts/` | Hand-run admin SQL for the SQL Editor, e.g. `make_moderator.sql`. |
 | `local/` | **Local testing only.** A stand-in for Supabase's `auth` schema and roles, plus scripts. Never run these against the hosted project. |
+
+## Applied to the hosted project (MN Capture)
+
+| Migration | Applied |
+|---|---|
+| `20261117230000_extensions.sql` | 2026-11-17 |
+| `20261117230100_core_schema.sql` | 2026-11-17 |
+| `20261117230200_security.sql` | 2026-11-17 |
+| `20261117230300_seed_monuments.sql` | 2026-11-17 |
+| `20261117230400_no_auto_expose.sql` | 2026-11-17 |
+| `20261118000000_profile_on_signup.sql` | 2026-11-17 |
+
+Add a row here whenever you run a new migration against the hosted project.
 
 ## Applying migrations to the hosted project
 

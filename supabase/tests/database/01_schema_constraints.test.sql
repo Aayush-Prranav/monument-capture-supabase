@@ -73,14 +73,12 @@ select throws_ok($$ update public.game_settings set lock_duration = interval '0'
 -- Fixtures: two players, one moderator, captures on Bethesda and Liberty
 -- ---------------------------------------------------------------------------
 
-insert into auth.users (id, email) values
-  ('00000000-0000-0000-0000-0000000000a1', 'p1@test.dev'),
-  ('00000000-0000-0000-0000-0000000000a2', 'p2@test.dev'),
-  ('00000000-0000-0000-0000-0000000000d1', 'mod@test.dev');
-insert into public.profiles (id, display_name, role) values
-  ('00000000-0000-0000-0000-0000000000a1', 'Player One', 'player'),
-  ('00000000-0000-0000-0000-0000000000a2', 'Player Two', 'player'),
-  ('00000000-0000-0000-0000-0000000000d1', 'Mod', 'moderator');
+-- Signing up creates each profile (migration 6); the moderator is promoted after.
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-0000000000a1', 'p1@test.dev', '{"display_name":"Player One"}'),
+  ('00000000-0000-0000-0000-0000000000a2', 'p2@test.dev', '{"display_name":"Player Two"}'),
+  ('00000000-0000-0000-0000-0000000000d1', 'mod@test.dev', '{"display_name":"Mod"}');
+update public.profiles set role = 'moderator' where id = '00000000-0000-0000-0000-0000000000d1';
 
 create temp table ids as select
   (select id from public.monuments where slug = 'bethesda') as bethesda,

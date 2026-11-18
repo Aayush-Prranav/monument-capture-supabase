@@ -8,13 +8,15 @@ import { MonumentMap } from "../components/map/MonumentMap";
 import { Screen } from "../components/Screen";
 import { Button } from "../components/ui";
 import { theme } from "../constants/theme";
-import { demo, useDemoState } from "../demo/store";
+import { useAuth } from "../auth/AuthContext";
+import { useDemoState } from "../demo/store";
 import { monumentViews, toMapMonument } from "../demo/views";
 import { useStatusTime } from "../hooks/useStatusTime";
 import type { GameHomeProps } from "./types";
 
 export function GameHome({ user }: GameHomeProps) {
   const state = useDemoState();
+  const { logout } = useAuth();
   const nowMs = useStatusTime();
   const views = monumentViews(state, user.id, nowMs);
   return (
@@ -29,7 +31,7 @@ export function GameHome({ user }: GameHomeProps) {
         />
       </View>
       <Text style={styles.note}>Signed in as {user.name}.</Text>
-      <Button label="Sign out" variant="dark" onPress={() => { demo.logout(); router.replace("/login"); }} />
+      <Button label="Sign out" variant="dark" onPress={() => { void logout().finally(() => router.replace("/login")); }} />
     </Screen>
   );
 }

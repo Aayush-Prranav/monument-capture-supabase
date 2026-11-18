@@ -1,33 +1,55 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
-import { demo, useCurrentUser } from "../demo/store";
+import { backendMode, type BackendMode } from "../backend/config";
+import { useCurrentUser } from "../demo/store";
 import type { User } from "../demo/types";
+import type { AuthBackend, AuthResult, SignUpInput } from "./authBackend";
+import { setAuthReady, useAuthReady } from "./authState";
+import { localAuth } from "./localAuth";
+import { supabaseAuth } from "./supabaseAuth";
 
-// US-01 mock authentication (originally by Iris).
-// The signed-in user now lives in the shared demo store, so the tabs, role
-// checks and screens all see the same session. The public API is unchanged:
-// wrap the app in <AuthProvider> and call useAuth().
+// US-01 authentication (originally Iris's mock login). The public API is the
+// same as before: wrap the app in <AuthProvider> and call useAuth(). Which
+// backend does the work is chosen by EXPO_PUBLIC_BACKEND (backend/config.ts).
+
+let backend: AuthBackend = backendMode === "supabase" ? supabaseAuth : localAuth;
+// Local mode knows the session synchronously; Supabase has to restore it first.
+setAuthReady(backend.kind === "local");
+
+/** Test helper: swap the backend. */
+export function __setAuthBackendForTests(next: AuthBackend) {
+  backend = next;
+  setAuthReady(next.kind === "local");
+}
 
 type AuthContextType = {
+  /** False while a saved session is still being restored. */
+  ready: boolean;
   isLoggedIn: boolean;
   user: User | undefined;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  backend: BackendMode;
+  canSignUp: boolean;
+  login: (email: string, password: string) => Promise<AuthResult>;
+  signUp: (input: SignUpInput) => Promise<AuthResult>;
+  logout: () => Promise<void>;
 };
 
-/** Kept so the app layout reads the same; the session itself is in the store. */
 export function AuthProvider({ children }: { children: ReactNode }) {
+  useEffect(() => backend.start(), []);
   return <>{children}</>;
 }
 
 export function useAuth(): AuthContextType {
   const user = useCurrentUser();
+  const ready = useAuthReady();
   return {
+    ready,
     isLoggedIn: !!user,
     user,
-    // Mock login for the Sprint 3 frontend prototype.
-    // Replace with backend authentication in a future sprint.
-    login: async (email, password) => demo.login(email, password) !== null,
-    logout: () => demo.logout(),
+    backend: backend.kind,
+    canSignUp: backend.canSignUp,
+    login: (email, password) => backend.login(email, password),
+    signUp: (input) => backend.signUp(input),
+    logout: () => backend.logout(),
   };
 }
