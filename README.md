@@ -9,6 +9,9 @@ This repository is the Supabase backend build of the CS-GY 6063 team project
 [SWE-1-GROUP-3/Monument_Capture](https://github.com/SWE-1-GROUP-3/Monument_Capture),
 started from its `dev_aayush_demo_mvp_1.0` branch with full history.
 
+**Play it:** https://aayush-prranav.github.io/monument-capture-supabase/
+(redeployed automatically on every push to `main`; see "Deployment" below).
+
 ## Layout
 
 | Path | What it is |
@@ -43,7 +46,7 @@ started from its `dev_aayush_demo_mvp_1.0` branch with full history.
 | 3 | `start_capture` / `cancel_capture` with server-side distance and moderator flags | Done |
 | 4 | Photo upload to Supabase Storage, `submit_capture` | Done |
 | 5 | `decide_capture` moderator transaction and review queue | Done |
-| 6 | Monument management for moderators, deployment | Next |
+| 6 | Monument management for moderators (`save_monument`, `set_monument_active`), deployment to GitHub Pages | Done |
 
 Until a stage lands, that part of the game still runs on the local store in
 the browser, behind the backend switch below.
@@ -86,6 +89,16 @@ Location can't be verified on the web anyway, so faking it for testing weakens
 nothing. Options: Chrome DevTools → ⋮ → More tools → **Sensors** → Location
 (no app code involved); `EXPO_PUBLIC_DEV_TOOLS=true` for the in-app tools; or
 the five campus test monuments around 40.694177, -73.986456 (labelled "(test)").
+
+## Deployment
+
+`.github/workflows/deploy-pages.yml` runs on every push to `main`: typecheck,
+tests, then a web build in Supabase mode with demo tools **off**, published to
+GitHub Pages over HTTPS (browsers only allow location and camera on HTTPS).
+`EXPO_BASE_URL` puts the build under the repo's subpath; it is unset locally.
+
+The workflow contains only the project URL and publishable key, which are
+public by design. Never add the secret key or the database password to it.
 
 ## Checks
 
