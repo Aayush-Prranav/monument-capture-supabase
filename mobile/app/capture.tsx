@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 
+import { RequireUser } from "../src/components/RequireUser";
 import { Screen } from "../src/components/Screen";
 import { Banner, Button, Card, Chip, DetailRow, Pill, SectionTitle } from "../src/components/ui";
 import { theme } from "../src/constants/theme";
@@ -37,7 +38,10 @@ export default function CaptureScreen() {
   const { monumentId } = useLocalSearchParams<{ monumentId?: string }>();
   const [submitted, setSubmitted] = useState<{ monumentName: string; monumentId: string } | null>(null);
 
-  if (!user) return null;
+  if (!user) {
+    // Still restoring a saved session, or signed out: same rules as every other screen.
+    return <RequireUser>{() => null}</RequireUser>;
+  }
   if (user.role !== "player") {
     return (
       <Screen title="Capture">
