@@ -7,8 +7,9 @@ import { useAuth } from "../auth/AuthContext";
 import { devToolsEnabled } from "../backend/config";
 import { game } from "../backend/game";
 import { usePhotoUrl } from "../backend/usePhotoUrl";
+import { FLAG_SHORT } from "../backend/flags";
 import { DemoTools } from "../components/DemoTools";
-import { LOCK_DURATION_MS, findMonument, formatTimeAgo, getHistoryFor, getHoldingsFor, getPendingQueue, getPlayerStats, getHold } from "../demo/rules";
+import { findMonument, formatTimeAgo, getHistoryFor, getHoldingsFor, getPendingQueue, getPlayerStats, getHold } from "../demo/rules";
 import { getCapturePosition, type PositionResult } from "../demo/location";
 import {
   distanceTo,
@@ -28,7 +29,7 @@ import {
   sortRecords,
   type RecordSort,
 } from "../demo/selectors";
-import { demo, useDemoState } from "../demo/store";
+import { demo, lockDurationMs, useDemoState } from "../demo/store";
 import type { User } from "../demo/types";
 import { monumentView, monumentViews } from "../demo/views";
 import type { CaptureCheck } from "../demo/rules";
@@ -341,7 +342,7 @@ export function RecordsSheet({ user, now }: { user: User; now: number }) {
   const state = useDemoState();
   const [sort, setSort] = useState<RecordSort>("holds");
   const [openId, setOpenId] = useState<string | null>(null);
-  const records = sortRecords(getPlayerRecords(state, user.id, now, LOCK_DURATION_MS), sort);
+  const records = sortRecords(getPlayerRecords(state, user.id, now, lockDurationMs(state)), sort);
   const totals = getRecordTotals(state, user.id, now);
   const maxMs = Math.max(1, ...records.map((r) => r.totalHeldMs));
 
@@ -429,6 +430,7 @@ export function QueueSheet({ now }: { now: number }) {
                   <small>{player?.name ?? "Unknown player"} · {capture.distanceMeters} m · {formatTimeAgo(now - (capture.submittedAt ?? now))}</small>
                   {held?.status === "held" ? <small style={{ color: "#e8590c" }}>Now held by {held.holder.name}</small> : null}
                   {capture.simulatedPosition ? <small>Simulated location</small> : null}
+                  {(capture.flags ?? []).map((f) => <small key={f} style={{ color: "#e8590c" }}>{FLAG_SHORT[f] ?? f}</small>)}
                 </div>
                 <span className="go">›</span>
               </li>

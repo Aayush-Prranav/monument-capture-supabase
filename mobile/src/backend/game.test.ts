@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createSeedState } from "../demo/seed";
 import { __setDemoStateForTests } from "../demo/store";
-import { game, startRefusalMessage } from "./game";
+import { decideRefusalMessage, game, startRefusalMessage } from "./game";
 import { __setSupabaseForTests } from "./supabaseClient";
 
 vi.mock("./config", () => ({
@@ -105,6 +105,31 @@ describe("submitting a capture against Supabase", () => {
     const result = await game.submitCapture("c1", "data:image/png;base64,iVBORw0KGgo=");
     expect(result.ok).toBe(false);
     expect(upload).not.toHaveBeenCalled();
+  });
+});
+
+describe("moderator decisions against Supabase", () => {
+  beforeEach(() => __setDemoStateForTests({ ...createSeedState(Date.now()), monuments: [] }));
+  afterEach(() => __setSupabaseForTests(null));
+
+  it("sends the decision and reason to decide_capture, then refreshes", async () => {
+    const rpc = fakeRpc({ decide_capture: { ok: true, decision: "approved" } });
+    expect(await game.decideCapture("c1", "approved", "")).toEqual({ ok: true });
+    expect(rpc).toHaveBeenCalledWith("decide_capture", { p_capture_id: "c1", p_decision: "approved", p_reason: "" });
+    expect(rpc).toHaveBeenCalledWith("get_game_state");
+  });
+
+  it("explains when another moderator got there first", async () => {
+    fakeRpc({ decide_capture: { ok: false, code: "already_held", holder_name: "Grace", locked_until: new Date(Date.now() + 30 * 60_000).toISOString() } });
+    const result = await game.decideCapture("c2", "approved", "");
+    expect(result).toMatchObject({ ok: false, code: "already_held", message: expect.stringMatching(/^This monument is already held by Grace for another 3\d min\. Reject this capture instead\.$/) });
+  });
+
+  it.each([
+    ["reason_required", "A reason is required to reject a capture."],
+    ["already_decided", "Another moderator has already decided this capture."],
+  ])("%s", (code, message) => {
+    expect(decideRefusalMessage({ ok: false, code })).toBe(message);
   });
 });
 

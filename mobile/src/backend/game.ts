@@ -82,6 +82,29 @@ export function submitRefusalMessage(code: string): string {
   }
 }
 
+type DecideRefusal = { ok: false; code: string; holder_name?: string; locked_until?: string; status?: string };
+
+export function decideRefusalMessage(r: DecideRefusal, now = demoNow()): string {
+  switch (r.code) {
+    case "reason_required":
+      return "A reason is required to reject a capture.";
+    case "already_held": {
+      const left = r.locked_until ? ` for another ${formatRemaining(Date.parse(r.locked_until) - now)}` : "";
+      return `This monument is already held${r.holder_name ? ` by ${r.holder_name}` : ""}${left}. Reject this capture instead.`;
+    }
+    case "already_decided":
+      return "Another moderator has already decided this capture.";
+    case "not_a_moderator":
+      return "Only moderators can review captures.";
+    case "own_capture":
+      return "You can't review your own capture.";
+    case "not_found":
+      return "This capture no longer exists.";
+    default:
+      return "The decision couldn't be saved. Try again.";
+  }
+}
+
 export const PHOTO_BUCKET = "capture-photos";
 
 /** Where a capture's photo must be uploaded; the server only accepts this path. */
@@ -174,6 +197,38 @@ export const game = {
       return { ok: true };
     } catch (e) {
       return failure(e, "Could not submit the capture.");
+    }
+  },
+
+  /**
+   * A moderator approves or rejects a pending capture. On the server this is
+   * one transaction that locks the monument first, so two moderators can
+   * never produce two holders.
+   */
+  async decideCapture(captureId: string, decision: "approved" | "rejected", reason: string): Promise<Result> {
+    if (backendMode === "local") {
+      try {
+        const moderator = getDemoState().sessionUserId;
+        if (!moderator) return { ok: false, message: "Sign in first." };
+        demo.review(captureId, moderator, decision, reason);
+        return { ok: true };
+      } catch (e) {
+        return failure(e, "Could not save the decision.");
+      }
+    }
+    try {
+      const { data, error } = await getSupabase().rpc("decide_capture", {
+        p_capture_id: captureId,
+        p_decision: decision,
+        p_reason: reason,
+      });
+      if (error) throw new Error(error.message);
+      const reply = data as { ok: true } | DecideRefusal;
+      await refreshMap();
+      if (!reply.ok) return { ok: false, code: reply.code, message: decideRefusalMessage(reply) };
+      return { ok: true };
+    } catch (e) {
+      return failure(e, "Could not save the decision.");
     }
   },
 
