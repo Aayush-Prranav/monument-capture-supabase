@@ -25,11 +25,11 @@ describe("map sync", () => {
     vi.useRealTimers();
   });
 
-  it("calls get_map and puts the server's monuments in the store", async () => {
+  it("calls get_game_state and puts the server's monuments in the store", async () => {
     const rpc = vi.fn(async () => ({ data: serverMap, error: null }));
     fakeClient(rpc);
     await refreshMap();
-    expect(rpc).toHaveBeenCalledWith("get_map");
+    expect(rpc).toHaveBeenCalledWith("get_game_state");
     expect(getDemoState().monuments.map((m) => m.name)).toEqual(["Bethesda Fountain"]);
     expect(getMapSyncStatus().state).toBe("ok");
   });
@@ -76,6 +76,19 @@ describe("map sync", () => {
     release();
     await Promise.all([a, b]);
     expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs a fresh read after an existing poll when a game action completes", async () => {
+    let release!: () => void;
+    const rpc = vi.fn()
+      .mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve({ data: serverMap, error: null }); }))
+      .mockResolvedValue({ data: serverMap, error: null });
+    fakeClient(rpc);
+    const poll = refreshMap();
+    const afterAction = refreshMap({ afterCurrent: true });
+    release();
+    await Promise.all([poll, afterAction]);
+    expect(rpc).toHaveBeenCalledTimes(2);
   });
   it("discards an old account's response and allows a new account to refresh immediately", async () => {
     vi.useFakeTimers();

@@ -80,7 +80,8 @@ it("opens the monument sheet with an enabled Capture when free and in range", as
   const cta = await within(sheet).findByRole("button", { name: "📷 Capture" });
   await waitFor(() => expect((cta as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(cta);
-  expect(router.push).toHaveBeenCalledWith("/capture");
+  // Starting a capture is asynchronous (it may go to the server).
+  await waitFor(() => expect(router.push).toHaveBeenCalledWith("/capture"));
   expect(getDemoState().captures.some((c) => c.monumentId === "washington-arch" && c.status === "in_progress")).toBe(true);
 });
 

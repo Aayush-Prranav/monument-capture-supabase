@@ -1,9 +1,11 @@
 import { devToolsEnabled } from "../src/backend/config";
+import { game } from "../src/backend/game";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 
+import { RequireUser } from "../src/components/RequireUser";
 import { Screen } from "../src/components/Screen";
 import { Banner, Button, Card, Chip, DetailRow, Pill, SectionTitle } from "../src/components/ui";
 import { theme } from "../src/constants/theme";
@@ -36,7 +38,10 @@ export default function CaptureScreen() {
   const { monumentId } = useLocalSearchParams<{ monumentId?: string }>();
   const [submitted, setSubmitted] = useState<{ monumentName: string; monumentId: string } | null>(null);
 
-  if (!user) return null;
+  if (!user) {
+    // Still restoring a saved session, or signed out: same rules as every other screen.
+    return <RequireUser>{() => null}</RequireUser>;
+  }
   if (user.role !== "player") {
     return (
       <Screen title="Capture">
@@ -112,14 +117,17 @@ function CheckStep({ monument, user }: { monument: Monument; user: User }) {
   const isChecking = check.status === "checking";
   const isEligible = check.status === "eligible" && checked;
 
+  const [starting, setStarting] = useState(false);
   const start = () => {
-    if (!checked) return;
-    try {
-      demo.startCapture(monument.id, user.id, checked.position, checked.simulated);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not start the capture.");
-      reset();
-    }
+    if (!checked || starting) return;
+    setStarting(true);
+    void game.startCapture(monument.id, checked.position, checked.simulated).then((result) => {
+      setStarting(false);
+      if (!result.ok) {
+        setError(result.message);
+        reset();
+      }
+    });
   };
 
   const teleport = (accuracyMeters: number, offsetMeters?: number) => {
@@ -161,7 +169,7 @@ function CheckStep({ monument, user }: { monument: Monument; user: User }) {
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       {isEligible ? (
-        <Button label="Start capture" icon="camera" onPress={start} />
+        <Button label={starting ? "Checking in…" : "Start capture"} icon="camera" onPress={start} disabled={starting} />
       ) : (
         <Button
           label={isChecking ? "Checking location…" : check.status === "idle" ? "Check my location" : "Check again"}
@@ -226,6 +234,24 @@ function PhotoStep({ capture, monument, onSubmitted }: { capture: Capture; monum
   const [photo, setPhoto] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const now = useNow(1000);
+  // Supabase mode: the photo must follow the check-in within a few minutes.
+  const expired = capture.expiresAt !== undefined && now >= capture.expiresAt;
+
+  if (expired) {
+    return (
+      <Screen title="Check-in expired" subtitle={`Your check-in at ${monument.name} ran out before a photo was submitted.`}>
+        <Banner tone="warning" title="Check in again">
+          The photo has to be taken soon after checking in, so it shows you were really there. Stand at the monument and start a new capture.
+        </Banner>
+        <Button
+          label="Check in again"
+          icon="locate"
+          onPress={() => { void game.cancelCapture(capture.id).then(() => returnToMap({ monumentId: monument.id })); }}
+        />
+      </Screen>
+    );
+  }
 
   const camera = useDemoState().settings.camera;
 
@@ -274,7 +300,7 @@ function PhotoStep({ capture, monument, onSubmitted }: { capture: Capture; monum
 
       {error ? <Banner tone="danger" title="Couldn't use that photo">{error}</Banner> : null}
       <Button label="Submit for review" icon="send" onPress={submit} disabled={!photo || busy} />
-      <Button label="Cancel capture" variant="ghost" onPress={() => { demo.cancelCapture(capture.id); returnToMap({ monumentId: monument.id }); }} />
+      <Button label="Cancel capture" variant="ghost" onPress={() => { void game.cancelCapture(capture.id).then(() => returnToMap({ monumentId: monument.id })); }} />
 
       {devToolsEnabled ? (
       <Card style={styles.demoCard}>
