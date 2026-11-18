@@ -1,3 +1,4 @@
+import { devToolsEnabled } from "../src/backend/config";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
@@ -173,6 +174,7 @@ function CheckStep({ monument, user }: { monument: Monument; user: User }) {
         />
       )}
 
+      {devToolsEnabled ? (
       <Card style={styles.demoCard}>
         <Text style={styles.demoLabel}>DEMO LOCATION</Text>
         <Text style={styles.statusMessage}>{locationSummary(sim)}</Text>
@@ -189,6 +191,7 @@ function CheckStep({ monument, user }: { monument: Monument; user: User }) {
           <Button compact variant="ghost" icon="cloud-offline-outline" label="GPS unavailable" onPress={() => setLoc({ mode: "unavailable" })} />
         </View>
       </Card>
+      ) : null}
     </Screen>
   );
 }
@@ -273,6 +276,7 @@ function PhotoStep({ capture, monument, onSubmitted }: { capture: Capture; monum
       <Button label="Submit for review" icon="send" onPress={submit} disabled={!photo || busy} />
       <Button label="Cancel capture" variant="ghost" onPress={() => { demo.cancelCapture(capture.id); returnToMap({ monumentId: monument.id }); }} />
 
+      {devToolsEnabled ? (
       <Card style={styles.demoCard}>
         <Text style={styles.demoLabel}>DEMO CAMERA</Text>
         <Text style={styles.statusMessage}>{cameraSummary[camera]}</Text>
@@ -282,6 +286,7 @@ function PhotoStep({ capture, monument, onSubmitted }: { capture: Capture; monum
           ))}
         </View>
       </Card>
+      ) : null}
     </Screen>
   );
 }

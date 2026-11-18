@@ -7,6 +7,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 
+import { devToolsEnabled } from "../backend/config";
 import type { PlayerPosition } from "../features/capture/types";
 import * as rules from "./rules";
 import { createSeedState, DEMO_PASSWORD, SEED_VERSION } from "./seed";
@@ -18,16 +19,29 @@ let lastSaveOk = true;
 const listeners = new Set<() => void>();
 
 function loadInitialState(): DemoState {
+  return withoutDemoSettingsUnlessEnabled(loadSavedState() ?? createSeedState(Date.now()));
+}
+
+function loadSavedState(): DemoState | null {
   const raw = demoStorage.load();
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw) as DemoState;
-      if (parsed && parsed.version === SEED_VERSION && Array.isArray(parsed.monuments)) return parsed;
-    } catch {
-      // Corrupt or old data: fall through to a fresh seed.
-    }
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as DemoState;
+    if (parsed && parsed.version === SEED_VERSION && Array.isArray(parsed.monuments)) return parsed;
+  } catch {
+    // Corrupt or old data: fall through to a fresh seed.
   }
-  return createSeedState(Date.now());
+  return null;
+}
+
+/**
+ * With demo tools turned off (EXPO_PUBLIC_DEV_TOOLS, Supabase mode), a fake
+ * location, camera mode or clock offset saved by an earlier session must not
+ * linger with no way to undo it: fall back to the real device and clock.
+ */
+function withoutDemoSettingsUnlessEnabled(loaded: DemoState): DemoState {
+  if (devToolsEnabled) return loaded;
+  return { ...loaded, settings: { clockOffsetMs: 0, location: { mode: "real" }, camera: "real" } };
 }
 
 function setState(next: DemoState) {
@@ -86,6 +100,16 @@ export const demo = {
     if (!user || password !== DEMO_PASSWORD) return null;
     setState({ ...state, sessionUserId: user.id });
     return user;
+  },
+  /**
+   * Signs in a user whose identity comes from the real backend (Supabase):
+   * adds or refreshes them in the store's user list so the game rules and
+   * screens can find them, and makes them the current session.
+   */
+  signInAs(user: User) {
+    const exists = state.users.some((u) => u.id === user.id);
+    const users = exists ? state.users.map((u) => (u.id === user.id ? { ...u, ...user } : u)) : [...state.users, user];
+    setState({ ...state, users, sessionUserId: user.id });
   },
   /** Demo tool: switch account without typing a password. */
   switchUser(userId: string) {

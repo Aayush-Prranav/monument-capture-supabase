@@ -22,11 +22,10 @@ delete from public.captures;
 delete from public.profiles where id in (select id from auth.users where email like 'race%@test.dev');
 delete from auth.users where email like 'race%@test.dev';
 
-insert into auth.users (id, email)
-select gen_random_uuid(), 'race' || g || '@test.dev' from generate_series(0, $n) g;
-insert into public.profiles (id, display_name, role)
-select id, email, case when email = 'race0@test.dev' then 'moderator' else 'player' end::public.app_role
-from auth.users where email like 'race%@test.dev';
+insert into auth.users (id, email, raw_user_meta_data)
+select gen_random_uuid(), 'race' || g || '@test.dev', jsonb_build_object('display_name', 'race' || g || '@test.dev')
+from generate_series(0, $n) g;
+update public.profiles set role = 'moderator' where display_name = 'race0@test.dev';
 
 insert into public.captures (monument_id, player_id, status, reported_latitude, reported_longitude,
                              reported_accuracy_m, distance_m, photo_path, submitted_at)
