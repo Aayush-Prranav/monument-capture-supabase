@@ -49,7 +49,7 @@ export function refreshMap(): Promise<void> {
     if (status.state !== "ok") setStatus({ state: "loading" });
     const sentAt = Date.now();
     try {
-      const { data, error } = await getSupabase().rpc("get_map");
+      const { data, error } = await getSupabase().rpc("get_game_state");
       const receivedAt = Date.now();
       if (error) throw new Error(error.message);
       demo.applyServerMap(parseServerMap(data), sentAt, receivedAt);

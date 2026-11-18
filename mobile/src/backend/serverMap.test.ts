@@ -74,16 +74,14 @@ describe("applying the server map", () => {
     expect(second.reviews).toHaveLength(0);
   });
 
-  it("keeps local work on known monuments and drops work on monuments the server doesn't have", () => {
+  it("replaces everything with the server's copy: local leftovers are dropped", () => {
     const base = world();
     base.captures = [
       { id: "local-1", monumentId: "m1", playerId: ME, status: "in_progress", distanceMeters: 5, accuracyMeters: 5,
         simulatedPosition: false, photoUri: "", startedAt: T0, submittedAt: null },
-      { id: "local-2", monumentId: "liberty", playerId: ME, status: "pending", distanceMeters: 5, accuracyMeters: 5,
-        simulatedPosition: false, photoUri: "x", startedAt: T0, submittedAt: T0 },
     ];
     const next = applyServerMap(base, map([monument("m1")]), T0, T0);
-    expect(next.captures.map((c) => c.id)).toEqual(["local-1"]);
+    expect(next.captures).toEqual([]);
   });
 
   it("hides nothing a moderator should see: inactive monuments come through marked inactive", () => {
@@ -91,6 +89,30 @@ describe("applying the server map", () => {
     expect(next.monuments[0]?.active).toBe(false);
     expect(monumentViews(next, ME, T0)).toHaveLength(0);
     expect(monumentViews(next, ME, T0, true)[0]?.kind).toBe("inactive");
+  });
+});
+
+describe("own captures and settings", () => {
+  it("brings in the player's captures with flags, photo marker, expiry and review", () => {
+    const next = applyServerMap(world(), {
+      ...map([monument("m1")]),
+      settings: { lock_duration_s: 3600, max_accuracy_m: 50, in_progress_ttl_s: 600 },
+      my_captures: [{
+        id: "c1", monument_id: "m1", player_id: ME, status: "rejected", distance_m: 41.6, reported_accuracy_m: 7.4,
+        flags: ["exact_pin"], photo_path: `${ME}/c1.jpg`,
+        started_at: new Date(T0 - 60_000).toISOString(), submitted_at: new Date(T0 - 30_000).toISOString(),
+        expires_at: new Date(T0 + 540_000).toISOString(),
+        review: { id: "r1", decision: "rejected", reason: "Blurry", reviewed_at: new Date(T0).toISOString(),
+                  locked_until: null, moderator_id: "mod-1", moderator_name: "Mod" },
+      }],
+    }, T0, T0);
+    expect(next.captures).toEqual([expect.objectContaining({
+      id: "c1", status: "rejected", distanceMeters: 42, accuracyMeters: 7, flags: ["exact_pin"],
+      photoUri: `storage:${ME}/c1.jpg`, expiresAt: T0 + 540_000,
+    })]);
+    expect(next.reviews).toEqual([expect.objectContaining({ captureId: "c1", decision: "rejected", reason: "Blurry", moderatorId: "mod-1" })]);
+    expect(next.users.find((u) => u.id === "mod-1")).toMatchObject({ name: "Mod", role: "moderator" });
+    expect(next.serverSettings).toEqual({ lockDurationMs: 3_600_000, maxAccuracyM: 50, inProgressTtlMs: 600_000 });
   });
 });
 

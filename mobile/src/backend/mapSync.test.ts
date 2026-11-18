@@ -25,11 +25,11 @@ describe("map sync", () => {
     vi.useRealTimers();
   });
 
-  it("calls get_map and puts the server's monuments in the store", async () => {
+  it("calls get_game_state and puts the server's monuments in the store", async () => {
     const rpc = vi.fn(async () => ({ data: serverMap, error: null }));
     fakeClient(rpc);
     await refreshMap();
-    expect(rpc).toHaveBeenCalledWith("get_map");
+    expect(rpc).toHaveBeenCalledWith("get_game_state");
     expect(getDemoState().monuments.map((m) => m.name)).toEqual(["Bethesda Fountain"]);
     expect(getMapSyncStatus().state).toBe("ok");
   });
