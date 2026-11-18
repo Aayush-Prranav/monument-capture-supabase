@@ -7,7 +7,8 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-import { devToolsEnabled } from "../backend/config";
+import { backendMode, devToolsEnabled } from "../backend/config";
+import { applyServerMap, type ServerMap } from "../backend/serverMap";
 import type { PlayerPosition } from "../features/capture/types";
 import * as rules from "./rules";
 import { createSeedState, DEMO_PASSWORD, SEED_VERSION } from "./seed";
@@ -19,7 +20,23 @@ let lastSaveOk = true;
 const listeners = new Set<() => void>();
 
 function loadInitialState(): DemoState {
-  return withoutDemoSettingsUnlessEnabled(loadSavedState() ?? createSeedState(Date.now()));
+  return withoutDemoSettingsUnlessEnabled(loadSavedState() ?? initialWorld(Date.now()));
+}
+
+/**
+ * Local mode: the seeded demo world (fake players, holds, a queue).
+ * Supabase mode: an empty world that the server fills in on sign-in, so no
+ * fake players ever appear next to real ones.
+ */
+function initialWorld(now: number): DemoState {
+  const seed = createSeedState(now);
+  if (backendMode === "local") return seed;
+  return { ...seed, users: [], monuments: [], captures: [], reviews: [] };
+}
+
+/** Everything that shifts the game clock: the demo fast-forward plus, in Supabase mode, the database clock. */
+export function totalClockOffsetMs(s: DemoState) {
+  return s.settings.clockOffsetMs + (s.serverClockOffsetMs ?? 0);
 }
 
 function loadSavedState(): DemoState | null {
@@ -59,9 +76,9 @@ export function getDemoState() {
   return state;
 }
 
-/** The game clock. Stands in for the server clock; the demo can fast-forward it. */
+/** The game clock: the database clock in Supabase mode, which the demo tools can fast-forward. */
 export function demoNow() {
-  return Date.now() + state.settings.clockOffsetMs;
+  return Date.now() + totalClockOffsetMs(state);
 }
 
 export function useDemoState(): DemoState {
@@ -75,7 +92,7 @@ export function useCurrentUser(): User | undefined {
 
 /** Current game time, re-rendering every `intervalMs` so countdowns tick. */
 export function useNow(intervalMs = 1000) {
-  const offset = useDemoState().settings.clockOffsetMs;
+  const offset = totalClockOffsetMs(useDemoState());
   const [real, setReal] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setReal(Date.now()), intervalMs);
@@ -110,6 +127,10 @@ export const demo = {
     const exists = state.users.some((u) => u.id === user.id);
     const users = exists ? state.users.map((u) => (u.id === user.id ? { ...u, ...user } : u)) : [...state.users, user];
     setState({ ...state, users, sessionUserId: user.id });
+  },
+  /** Supabase mode: replace monuments and current holds with the server's (Stage 2). */
+  applyServerMap(map: ServerMap, sentAt: number, receivedAt: number) {
+    setState(applyServerMap(state, map, sentAt, receivedAt));
   },
   /** Demo tool: switch account without typing a password. */
   switchUser(userId: string) {
@@ -179,6 +200,16 @@ export const demo = {
   },
   /** Restores the seed data but keeps the current user signed in. */
   reset() {
+    if (backendMode === "supabase") {
+      // Server data is the truth: drop only local leftovers and demo settings.
+      setState({
+        ...state,
+        captures: state.captures.filter((c) => c.source === "server"),
+        reviews: state.reviews.filter((r) => r.source === "server"),
+        settings: { clockOffsetMs: 0, location: { mode: "real" }, camera: "real" },
+      });
+      return;
+    }
     const fresh = createSeedState(Date.now());
     const keep = rules.findUser(state, state.sessionUserId);
     const users = keep && !fresh.users.some((u) => u.id === keep.id) ? [...fresh.users, keep] : fresh.users;

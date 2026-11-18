@@ -39,8 +39,8 @@ started from its `dev_aayush_demo_mvp_1.0` branch with full history.
 |---|---|---|
 | 0 | Schema, one-holder constraint, RLS, monument seed | Done, applied to the hosted project |
 | 1 | Real sign-up and login, profile created on sign-up, moderator script | Done |
-| 2 | Map reads monuments and holds from the server | Next |
-| 3 | `start_capture` with server-side distance and moderator flags | |
+| 2 | Map reads monuments and holds from the server (`get_map()`), server clock | Done |
+| 3 | `start_capture` with server-side distance and moderator flags | Next |
 | 4 | `decide_capture` moderator transaction | |
 | 5 | Photo upload to Supabase Storage | |
 | 6 | Monument management for moderators, deployment | |

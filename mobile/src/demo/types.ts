@@ -31,6 +31,8 @@ export type Monument = {
 export type CaptureStatus = "in_progress" | "pending" | "approved" | "rejected";
 
 export type Capture = {
+  /** "server": a copy of a row from Supabase (replaced on every sync). Absent: created locally. */
+  source?: "server";
   id: string;
   monumentId: string;
   playerId: string;
@@ -48,6 +50,8 @@ export type Capture = {
 export type ReviewDecision = "approved" | "rejected";
 
 export type CaptureReview = {
+  /** "server": a copy of a row from Supabase (replaced on every sync). Absent: created locally. */
+  source?: "server";
   id: string;
   captureId: string;
   moderatorId: string;
@@ -83,6 +87,8 @@ export type DemoState = {
   captures: Capture[];
   reviews: CaptureReview[];
   sessionUserId: string | null;
+  /** Supabase mode: database clock minus device clock, measured on each sync. */
+  serverClockOffsetMs?: number;
   settings: DemoSettings;
 };
 
