@@ -16,7 +16,7 @@ Each part below connects one piece of the game to the server. Each one lands as 
 | # | Part | Owner | Status |
 |---|---|---|---|
 | 1 | Real sign-up and login, profile created on sign-up | Iris | Done |
-| 2 | Map reads monuments and holds from the server, server clock | Bill | Not started |
+| 2 | Map reads monuments and holds from the server, server clock | Bill | Done |
 | 3 | Start / cancel a capture on the server (distance, accuracy, moderator flags); deploy to GitHub Pages | Jason | Not started |
 | 4 | Photos to Supabase Storage, submitting, moderator approve/reject and review queue | Aayush | Not started |
 | 5 | Moderators manage monuments and can end a hold early | Yuming | Not started |

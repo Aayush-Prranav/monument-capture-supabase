@@ -1,5 +1,9 @@
-// Web: persists demo data in localStorage so it survives a page refresh.
-const KEY = "monument-capture-demo";
+// Web: persists the game store in localStorage so it survives a page refresh.
+// Each backend has its own key, so the local demo's fake players never leak
+// into a Supabase session (and switching back restores the demo as it was).
+import { backendMode } from "../backend/config";
+
+const KEY = backendMode === "local" ? "monument-capture-demo" : "monument-capture-supabase-cache";
 
 export const demoStorage = {
   load(): string | null {
